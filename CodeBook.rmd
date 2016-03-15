@@ -1,0 +1,76 @@
+---
+title: 'Data Wrangling: Basic Data Manipulation'
+author: "Jonathan Freeland"
+date: "March 15, 2016"
+output:
+  html_document:
+    theme: null
+    css: "style.css"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(printr)
+```
+
+Wrangling performed on a [simple dataset](https://drive.google.com/file/d/0B9vKjeWdQHa5OE5UQ1k4TWJlelU/view) of product orders.
+The following code will:
+
+* Clean the 'company' column of misspellings and case differences.
+* Separate product code and number.
+* Add product categories.
+* Add full address for geocoding.
+* Create dummy binary variables for company and product category.
+
+***
+
+Read in the data.
+```{r, cache=TRUE}
+data <- read_csv("refine_original.csv")
+```
+
+Clean up the company names.
+```{r}
+company_names <- c("philips", "akzo", "vanhouten", "unilever")  # acceptable company names
+data$company <- lapply(data$company, tolower)                   # all names as lowercase
+dist <- adist(data$company, company_names)                      # compute string distances
+data$company <- company_names[apply(dist, 1, which.min)]        # choose acceptable name with least distance
+```
+
+Separate the product code and number.
+```{r}
+data <- data %>% separate(`Product code / number`, into = c("product_code", "product_number"), sep = "-")
+```
+
+Add product categories.
+```{r}
+categories <- c("smartphone","tv","laptop","tablet")
+names(categories) <- c("p","v","x","q")
+data <- data %>% mutate(product_category = categories[product_code])
+```
+
+Add full address.
+```{r}
+data <- data %>% unite(full_address, address, city, country, sep=", ", remove = FALSE)
+```
+
+Add dummy columns for company and product category.
+```{r}
+companies <- (data %>% distinct(company))$company
+for(theCompany in companies) # why NROW and not nrow?
+  data[paste0("company_",theCompany)] <- as.numeric(data$company == theCompany)
+
+for(theCategory in categories)
+  data[paste0("category_",theCategory)] <- as.numeric(data$product_category == theCategory)
+```
+
+Export the cleaned data set.
+```{r}
+write.csv(data, "refine_clean.csv")
+```
+```{r, echo=FALSE}
+head(data)
+```
